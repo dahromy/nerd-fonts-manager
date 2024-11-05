@@ -11,25 +11,53 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Verify files exist
+        run: |
+          if [ ! -f "install-nerd-fonts.sh" ]; then
+            echo "Error: install-nerd-fonts.sh not found"
+            exit 1
+          fi
+          if [ ! -f "README.md" ]; then
+            echo "Error: README.md not found"
+            exit 1
+          fi
+          echo "Files verified successfully"
+          ls -la install-nerd-fonts.sh README.md
       
       - name: Get version from tag
         id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Creating release for version: $VERSION"
       
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
+        uses: actions/create-release@latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref }}
           release_name: Release ${{ github.ref }}
+          body: |
+            Release ${{ github.ref }}
+            
+            ## Changes
+            - Added backup functionality with timestamped backups
+            - Improved profile handling with better formatting
+            - Enhanced profile display and listing
+            - Better cross-platform compatibility
+            - Added proper error handling
+            - Fixed font cache refresh commands
           draft: false
           prerelease: false
           
       - name: Upload Script
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -39,7 +67,7 @@ jobs:
           asset_content_type: text/x-shellscript
           
       - name: Upload README
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -47,3 +75,15 @@ jobs:
           asset_path: ./README.md
           asset_name: README.md
           asset_content_type: text/markdown
+
+      - name: Verify Release
+        run: |
+          echo "Waiting for release to be available..."
+          sleep 10
+          ASSET_URL="https://github.com/${{ github.repository }}/releases/latest/download/install-nerd-fonts.sh"
+          echo "Checking asset at: $ASSET_URL"
+          curl -sSf -o /dev/null "$ASSET_URL" || {
+            echo "Error: Release asset not accessible"
+            exit 1
+          }
+          echo "Release verified successfully"
