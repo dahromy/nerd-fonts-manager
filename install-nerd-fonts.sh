@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Script metadata
-SCRIPT_VERSION="1.0.0"
-SCRIPT_REPO="dahromy/nerd-fonts-manager"  # Replace with your repo name
+SCRIPT_VERSION="1.0.1"
+SCRIPT_REPO="dahromy/nerd-fonts-manager"
 
-# Self-update function
+[Rest of the script content...]
 check_self_update() {
     log "INFO" "Checking for script updates..."
     
@@ -77,14 +77,14 @@ PREVIEW_TEXT="ABCDEFGHIJKLM\nabcdefghijklm\n1234567890\n!@#$%^&*()\nThe quick br
 
 # Installation profiles
 declare -A PROFILES=(
-    ["coding"]="FiraCode,JetBrainsMono,Hack,CascadiaCode"
-    ["terminal"]="Meslo,UbuntuMono,DejaVuSansMono"
-    ["all-mono"]="FiraCode,JetBrainsMono,Hack,CascadiaCode,Meslo,UbuntuMono,DejaVuSansMono"
+    ["coding"]="FiraCode JetBrainsMono Hack CascadiaCode"
+    ["terminal"]="Meslo UbuntuMono DejaVuSansMono"
+    ["all-mono"]="FiraCode JetBrainsMono Hack CascadiaCode Meslo UbuntuMono DejaVuSansMono"
 )
 
 # Detect OS and set platform-specific variables
 detect_os() {
-    case "$(uname -s)" in
+    case "$(uname -s 2>/dev/null || echo 'unknown')" in
         Linux*)
             OS="linux"
             if grep -q Microsoft /proc/version 2>/dev/null; then
@@ -94,7 +94,7 @@ detect_os() {
         Darwin*)
             OS="macos"
             ;;
-        MINGW*|MSYS*|CYGWIN*)
+        MINGW*|MSYS*|CYGWIN*|unknown)
             OS="windows"
             ;;
         *)
@@ -151,6 +151,31 @@ FONTS_DIR="$FONTS_DIR"
 PARALLEL_DOWNLOADS=$PARALLEL_DOWNLOADS
 PROXY_URL="$PROXY_URL"
 EOF
+}
+
+# Backup existing fonts
+backup_fonts() {
+    if [ "$NO_BACKUP" = true ]; then
+        log "INFO" "Skipping backup as requested"
+        return
+    fi
+
+    if [ -d "$FONTS_DIR" ]; then
+        local backup_timestamp
+        backup_timestamp=$(date '+%Y%m%d_%H%M%S')
+        local backup_path="${BACKUP_DIR}_${backup_timestamp}"
+        
+        log "INFO" "Backing up existing fonts to $backup_path"
+        mkdir -p "$backup_path"
+        
+        # Copy existing fonts to backup directory
+        if [ -n "$(ls -A "$FONTS_DIR" 2>/dev/null)" ]; then
+            cp -r "$FONTS_DIR"/* "$backup_path"/ 2>/dev/null || true
+            log "INFO" "Backup completed"
+        else
+            log "INFO" "No existing fonts to backup"
+        fi
+    fi
 }
 
 # Default values
@@ -304,18 +329,28 @@ parse_args() {
 
 # Check for required dependencies
 check_dependencies() {
-    local deps=("curl" "jq" "wget" "unzip")
+    local deps=("curl" "wget" "unzip")
     
     # Add platform-specific dependencies
     case "$OS" in
         linux|wsl)
-            deps+=("parallel" "convert" "fc-list")
+            if command -v parallel &>/dev/null; then
+                deps+=("parallel")
+            fi
+            if command -v convert &>/dev/null; then
+                deps+=("convert")
+            fi
+            if command -v fc-list &>/dev/null; then
+                deps+=("fc-list")
+            fi
             ;;
         macos)
-            deps+=("convert")
+            if command -v convert &>/dev/null; then
+                deps+=("convert")
+            fi
             ;;
         windows)
-            deps+=("parallel" "convert")
+            # Windows only requires basic dependencies
             ;;
     esac
     
@@ -338,7 +373,10 @@ check_dependencies() {
                 log "INFO" "Install using: brew install ${missing[*]}"
                 ;;
             windows)
-                log "INFO" "Install dependencies through Git Bash or WSL package manager"
+                log "INFO" "Install Git Bash from https://git-scm.com/download/win"
+                log "INFO" "Then run these commands in Git Bash:"
+                log "INFO" "curl -o wget.exe https://eternallybored.org/misc/wget/releases/wget.exe"
+                log "INFO" "mv wget.exe /usr/bin/"
                 ;;
         esac
         exit 1
@@ -358,17 +396,15 @@ verify_font() {
     # Check file integrity
     case "$OS" in
         linux|wsl)
-            fc-validate "$font_file" &>/dev/null
-            return $?
+            if command -v fc-validate &>/dev/null; then
+                fc-validate "$font_file" &>/dev/null
+                return $?
+            else
+                [ -r "$font_file" ]
+                return $?
+            fi
             ;;
-        macos)
-            # macOS doesn't have a built-in font validator
-            # Just check if file is readable
-            [ -r "$font_file" ]
-            return $?
-            ;;
-        windows)
-            # Windows doesn't have a built-in font validator
+        macos|windows)
             # Just check if file is readable
             [ -r "$font_file" ]
             return $?
@@ -388,19 +424,28 @@ generate_preview() {
     font_file=$(find "$FONTS_DIR/$font" -type f \( -name "*.ttf" -o -name "*.otf" \) -print -quit)
     
     if [ -n "$font_file" ]; then
-        $PREVIEW_COMMAND "$font_file" -pointsize 24 -gravity center -annotate +0+0 "$PREVIEW_TEXT" "$preview_file"
-        
-        case "$OS" in
-            linux|wsl)
-                xdg-open "$preview_file" &>/dev/null || display "$preview_file" &>/dev/null || true
-                ;;
-            macos)
-                open "$preview_file"
-                ;;
-            windows)
-                cmd.exe /c start "$(cygpath -w "$preview_file")" &>/dev/null || true
-                ;;
-        esac
+        if command -v convert &>/dev/null; then
+            $PREVIEW_COMMAND "$font_file" -pointsize 24 -gravity center -annotate +0+0 "$PREVIEW_TEXT" "$preview_file"
+            
+            case "$OS" in
+                linux|wsl)
+                    if command -v xdg-open &>/dev/null; then
+                        xdg-open "$preview_file" &>/dev/null || display "$preview_file" &>/dev/null || true
+                    else
+                        log "INFO" "Preview generated at: $preview_file"
+                    fi
+                    ;;
+                macos)
+                    open "$preview_file"
+                    ;;
+                windows)
+                    cmd.exe /c start "$(cygpath -w "$preview_file")" &>/dev/null || true
+                    ;;
+            esac
+        else
+            log "INFO" "ImageMagick not found. Preview not available."
+            log "INFO" "Font file location: $font_file"
+        fi
     else
         log "ERROR" "No font file found for $font"
         return 1
@@ -460,6 +505,41 @@ download_with_resume() {
     else
         wget "${proxy_args[@]}" --show-progress --progress=bar:force:noscroll "$url" -O "$output"
     fi
+}
+
+# Install fonts in parallel or sequentially
+install_fonts() {
+    local fonts=("$@")
+    local version="$version"
+    
+    case "$OS" in
+        windows)
+            # Sequential installation for Windows
+            for font in "${fonts[@]}"; do
+                install_font "$font" "$version"
+            done
+            ;;
+        macos)
+            # Use xargs for macOS parallel processing
+            if command -v xargs &>/dev/null; then
+                printf '%s\n' "${fonts[@]}" | xargs -P "$PARALLEL_DOWNLOADS" -I {} bash -c "install_font {} '$version'"
+            else
+                for font in "${fonts[@]}"; do
+                    install_font "$font" "$version"
+                done
+            fi
+            ;;
+        *)
+            # Use GNU parallel for other platforms if available
+            if command -v parallel &>/dev/null; then
+                printf '%s\n' "${fonts[@]}" | parallel -j "$PARALLEL_DOWNLOADS" install_font {} "$version"
+            else
+                for font in "${fonts[@]}"; do
+                    install_font "$font" "$version"
+                done
+            fi
+            ;;
+    esac
 }
 
 # Install font
@@ -604,59 +684,61 @@ main() {
             # Handle profile selection
             if [ -n "$SELECTED_PROFILE" ]; then
                 if [ -n "${PROFILES[$SELECTED_PROFILE]}" ]; then
-                    SELECTED_FONTS="${PROFILES[$SELECTED_PROFILE]}"
+                    local profile_fonts
+                    read -ra profile_fonts <<< "${PROFILES[$SELECTED_PROFILE]}"
+                    fonts_to_install=("${profile_fonts[@]}")
                     log "INFO" "Using profile: $SELECTED_PROFILE"
                 else
                     log "ERROR" "Invalid profile: $SELECTED_PROFILE"
                     exit 1
                 fi
-            fi
-
-            # Determine fonts to install
-            local fonts_to_install=()
-            if [ "$INSTALL_ALL" = true ]; then
-                fonts_to_install=("${all_fonts[@]}")
-            elif [ -n "$SELECTED_FONTS" ]; then
-                IFS=',' read -ra fonts_to_install <<< "$SELECTED_FONTS"
-                # Validate selected fonts
-                for font in "${fonts_to_install[@]}"; do
-                    if [[ ! " ${all_fonts[@]} " =~ " ${font} " ]]; then
-                        log "ERROR" "Invalid font selection: $font"
-                        exit 1
-                    fi
-                done
             else
-                # Interactive selection
-                echo "Available fonts (${#all_fonts[@]} total):"
-                for i in "${!all_fonts[@]}"; do
-                    echo "$((i+1)). ${all_fonts[$i]}"
-                done
-
-                while true; do
-                    echo -e "\nEnter the numbers of the fonts you want to install (space-separated), or 'all' for all fonts:"
-                    read -r input
-
-                    if [ "$input" = "all" ]; then
-                        fonts_to_install=("${all_fonts[@]}")
-                        break
-                    fi
-
-                    # Convert input to array
-                    read -ra selected_indices <<< "$input"
-                    
-                    # Validate selections
-                    invalid=false
-                    for index in "${selected_indices[@]}"; do
-                        if ! [[ "$index" =~ ^[0-9]+$ ]] || [ "$index" -lt 1 ] || [ "$index" -gt ${#all_fonts[@]} ]; then
-                            log "ERROR" "'$index' is not a valid font number."
-                            invalid=true
-                            break
+                # Determine fonts to install
+                local fonts_to_install=()
+                if [ "$INSTALL_ALL" = true ]; then
+                    fonts_to_install=("${all_fonts[@]}")
+                elif [ -n "$SELECTED_FONTS" ]; then
+                    IFS=',' read -ra fonts_to_install <<< "$SELECTED_FONTS"
+                    # Validate selected fonts
+                    for font in "${fonts_to_install[@]}"; do
+                        if [[ ! " ${all_fonts[@]} " =~ " ${font} " ]]; then
+                            log "ERROR" "Invalid font selection: $font"
+                            exit 1
                         fi
-                        fonts_to_install+=("${all_fonts[$((index-1))]}")
+                    done
+                else
+                    # Interactive selection
+                    echo "Available fonts (${#all_fonts[@]} total):"
+                    for i in "${!all_fonts[@]}"; do
+                        echo "$((i+1)). ${all_fonts[$i]}"
                     done
 
-                    [ "$invalid" = false ] && break
-                done
+                    while true; do
+                        echo -e "\nEnter the numbers of the fonts you want to install (space-separated), or 'all' for all fonts:"
+                        read -r input
+
+                        if [ "$input" = "all" ]; then
+                            fonts_to_install=("${all_fonts[@]}")
+                            break
+                        fi
+
+                        # Convert input to array
+                        read -ra selected_indices <<< "$input"
+                        
+                        # Validate selections
+                        invalid=false
+                        for index in "${selected_indices[@]}"; do
+                            if ! [[ "$index" =~ ^[0-9]+$ ]] || [ "$index" -lt 1 ] || [ "$index" -gt ${#all_fonts[@]} ]; then
+                                log "ERROR" "'$index' is not a valid font number."
+                                invalid=true
+                                break
+                            fi
+                            fonts_to_install+=("${all_fonts[$((index-1))]}")
+                        done
+
+                        [ "$invalid" = false ] && break
+                    done
+                fi
             fi
 
             log "INFO" "Selected fonts (${#fonts_to_install[@]}): ${fonts_to_install[*]}"
@@ -664,22 +746,16 @@ main() {
             # Backup existing fonts
             backup_fonts
 
-            # Install fonts in parallel
-            log "INFO" "Installing fonts with $PARALLEL_DOWNLOADS parallel downloads..."
-            if [ "$OS" = "macos" ]; then
-                # Use xargs for macOS parallel processing
-                printf '%s\n' "${fonts_to_install[@]}" | xargs -P "$PARALLEL_DOWNLOADS" -I {} bash -c "install_font {} '$version'"
-            else
-                # Use GNU parallel for other platforms
-                printf '%s\n' "${fonts_to_install[@]}" | parallel -j "$PARALLEL_DOWNLOADS" install_font {} "$version"
-            fi
+            # Install fonts
+            log "INFO" "Installing fonts..."
+            install_fonts "${fonts_to_install[@]}"
 
             # Cleanup and refresh font cache
             log "INFO" "Cleaning up..."
             find "$FONTS_DIR" -name 'Windows Compatible' -type d -exec rm -rf {} + 2>/dev/null || true
 
             # Refresh font cache
-            refresh_font_cache
+            $REFRESH_COMMAND
             ;;
             
         uninstall)
@@ -693,7 +769,7 @@ main() {
                 uninstall_font "$font"
             done
             
-            refresh_font_cache
+            $REFRESH_COMMAND
             ;;
             
         update)
@@ -720,24 +796,36 @@ main() {
             if [ -n "$SELECTED_PROFILE" ]; then
                 if [ -n "${PROFILES[$SELECTED_PROFILE]}" ]; then
                     echo "Fonts in profile '$SELECTED_PROFILE':"
-                    IFS=',' read -ra profile_fonts <<< "${PROFILES[$SELECTED_PROFILE]}"
-                    printf '%s\n' "${profile_fonts[@]}"
+                    echo "-----------------------------"
+                    for font in ${PROFILES[$SELECTED_PROFILE]}; do
+                        echo "  - $font"
+                    done
                 else
                     log "ERROR" "Invalid profile: $SELECTED_PROFILE"
                     exit 1
                 fi
             else
                 echo "Available installation profiles:"
+                echo "-----------------------------"
                 for profile in "${!PROFILES[@]}"; do
-                    echo "$profile: ${PROFILES[$profile]}"
+                    echo "$profile:"
+                    for font in ${PROFILES[$profile]}; do
+                        echo "  - $font"
+                    done
+                    echo
                 done
             fi
             ;;
             
         profile)
             echo "Available installation profiles:"
+            echo "-----------------------------"
             for profile in "${!PROFILES[@]}"; do
-                echo "$profile: ${PROFILES[$profile]}"
+                echo "$profile:"
+                for font in ${PROFILES[$profile]}; do
+                    echo "  - $font"
+                done
+                echo
             done
             ;;
     esac
