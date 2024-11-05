@@ -36,15 +36,12 @@ jobs:
           echo "Creating release for version: $VERSION"
       
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@latest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          name: Release ${{ github.ref_name }}
+          tag: ${{ github.ref_name }}
           body: |
-            Release ${{ github.ref }}
+            Release ${{ github.ref_name }}
             
             ## Changes
             - Added backup functionality with timestamped backups
@@ -55,31 +52,14 @@ jobs:
             - Fixed font cache refresh commands
           draft: false
           prerelease: false
-          
-      - name: Upload Script
-        uses: actions/upload-release-asset@latest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./install-nerd-fonts.sh
-          asset_name: install-nerd-fonts.sh
-          asset_content_type: text/x-shellscript
-          
-      - name: Upload README
-        uses: actions/upload-release-asset@latest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./README.md
-          asset_name: README.md
-          asset_content_type: text/markdown
+          artifacts: "install-nerd-fonts.sh,README.md"
+          makeLatest: true
+          allowUpdates: true
 
       - name: Verify Release
         run: |
           echo "Waiting for release to be available..."
-          sleep 10
+          sleep 15
           ASSET_URL="https://github.com/${{ github.repository }}/releases/latest/download/install-nerd-fonts.sh"
           echo "Checking asset at: $ASSET_URL"
           curl -sSf -o /dev/null "$ASSET_URL" || {
