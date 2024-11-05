@@ -35,6 +35,13 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Creating release for version: $VERSION"
       
+      - name: Update README version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          # Update version in README installation instructions
+          sed -i "s|/releases/download/v[0-9.]\+/|/releases/download/$VERSION/|g" README.md
+          echo "Updated README with version: $VERSION"
+          
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
@@ -42,6 +49,13 @@ jobs:
           tag: ${{ github.ref_name }}
           body: |
             Release ${{ github.ref_name }}
+            
+            ## Installation
+            ```bash
+            curl -o install-nerd-fonts.sh https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/install-nerd-fonts.sh
+            chmod +x install-nerd-fonts.sh
+            ./install-nerd-fonts.sh
+            ```
             
             ## Changes
             - Added backup functionality with timestamped backups
@@ -53,14 +67,14 @@ jobs:
           draft: false
           prerelease: false
           artifacts: "install-nerd-fonts.sh,README.md"
-          makeLatest: true
           allowUpdates: true
 
       - name: Verify Release
         run: |
           echo "Waiting for release to be available..."
           sleep 15
-          ASSET_URL="https://github.com/${{ github.repository }}/releases/latest/download/install-nerd-fonts.sh"
+          VERSION=${GITHUB_REF#refs/tags/}
+          ASSET_URL="https://github.com/${{ github.repository }}/releases/download/$VERSION/install-nerd-fonts.sh"
           echo "Checking asset at: $ASSET_URL"
           curl -sSf -o /dev/null "$ASSET_URL" || {
             echo "Error: Release asset not accessible"
