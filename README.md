@@ -20,6 +20,7 @@ A cross-platform shell script for installing, managing, and previewing [Nerd Fon
   - Check for font updates
   - Automatic version tracking
   - Selective font updates
+  - Script auto-update support
 
 - 👀 **Preview Capabilities**
   - Generate font previews
@@ -53,14 +54,19 @@ Install the required dependencies through Git Bash or WSL package manager.
 
 ## Installation
 
-1. Download the script:
+1. Download the latest version:
 ```bash
-curl -o install-nerd-fonts.sh https://raw.githubusercontent.com/gist/[gist-id]/install-nerd-fonts.sh
+curl -o install-nerd-fonts.sh https://github.com/dahromy/nerd-fonts-manager/releases/latest/download/install-nerd-fonts.sh
 ```
 
 2. Make it executable:
 ```bash
 chmod +x install-nerd-fonts.sh
+```
+
+### One-Line Installation
+```bash
+curl -o- https://github.com/dahromy/nerd-fonts-manager/releases/latest/download/install-nerd-fonts.sh | bash
 ```
 
 ## Usage
@@ -98,7 +104,11 @@ chmod +x install-nerd-fonts.sh
 
 4. Check for updates:
 ```bash
+# Check for font updates
 ./install-nerd-fonts.sh update
+
+# Check for script updates
+./install-nerd-fonts.sh --update
 ```
 
 5. List available profiles:
@@ -155,6 +165,38 @@ FONTS_DIR="/custom/fonts/path"
 PARALLEL_DOWNLOADS=4
 PROXY_URL="http://proxy.example.com:8080"
 ```
+
+## Auto-Update
+
+The script includes self-update functionality using GitHub releases:
+
+```bash
+# Check for script updates
+./install-nerd-fonts.sh --update
+```
+
+When a new version is available, the script will:
+1. Download the latest version
+2. Backup the current version
+3. Replace the script with the new version
+4. Automatically restart with the same arguments
+
+## Development
+
+### Creating a New Release
+
+1. Update `SCRIPT_VERSION` in the script
+2. Commit your changes
+3. Create and push a new tag:
+```bash
+git tag -a v1.0.1 -m "Release v1.0.1"
+git push origin v1.0.1
+```
+
+The GitHub Actions workflow will automatically:
+1. Create a new release
+2. Upload the script and README
+3. Make them available for auto-update
 
 ## Platform-Specific Notes
 

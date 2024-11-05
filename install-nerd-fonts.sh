@@ -1,5 +1,73 @@
 #!/bin/bash
 
+# Script metadata
+SCRIPT_VERSION="1.0.0"
+SCRIPT_REPO="dahromy/nerd-fonts-manager"  # Replace with your repo name
+
+# Self-update function
+check_self_update() {
+    log "INFO" "Checking for script updates..."
+    
+    # Get latest release info
+    local release_info
+    release_info=$(curl -s "https://api.github.com/repos/$SCRIPT_REPO/releases/latest")
+    if [ $? -ne 0 ]; then
+        log "ERROR" "Failed to check for updates"
+        return 1
+    fi
+    
+    # Get latest version
+    local latest_version
+    latest_version=$(echo "$release_info" | jq -r '.tag_name')
+    if [ -z "$latest_version" ] || [ "$latest_version" = "null" ]; then
+        log "ERROR" "Failed to get latest version"
+        return 1
+    fi
+    
+    # Compare versions (strip 'v' prefix)
+    if [ "${latest_version#v}" != "$SCRIPT_VERSION" ]; then
+        log "INFO" "New version available: $SCRIPT_VERSION -> ${latest_version#v}"
+        
+        # Get download URL
+        local download_url
+        download_url=$(echo "$release_info" | jq -r '.assets[] | select(.name == "install-nerd-fonts.sh") | .browser_download_url')
+        if [ -z "$download_url" ] || [ "$download_url" = "null" ]; then
+            log "ERROR" "Failed to get download URL"
+            return 1
+        fi
+        
+        # Download new version
+        local temp_script="/tmp/install-nerd-fonts.sh.tmp"
+        if ! curl -s -L "$download_url" -o "$temp_script"; then
+            log "ERROR" "Failed to download update"
+            rm -f "$temp_script"
+            return 1
+        fi
+        
+        # Check if download was successful and file is not empty
+        if [ ! -s "$temp_script" ]; then
+            log "ERROR" "Downloaded file is empty"
+            rm -f "$temp_script"
+            return 1
+        fi
+        
+        # Backup current script
+        cp "$0" "$0.backup"
+        
+        # Replace current script with new version
+        mv "$temp_script" "$0"
+        chmod +x "$0"
+        
+        log "INFO" "Script updated successfully. Previous version backed up to $0.backup"
+        log "INFO" "Restarting script..."
+        
+        # Restart script
+        exec "$0" "$@"
+    else
+        log "INFO" "Script is up to date ($SCRIPT_VERSION)"
+    fi
+}
+
 set -e  # Exit on error
 
 # Configuration file
@@ -120,6 +188,7 @@ Options:
     --preview-text TEXT  Custom text for font preview
     --config FILE        Use custom config file
     --save-config        Save current settings as default
+    --update             Check for script updates
 
 Profiles:
     coding              Popular coding fonts
@@ -132,6 +201,7 @@ Example:
     $(basename "$0") preview FiraCode
     $(basename "$0") install --profile coding
     $(basename "$0") update
+    $(basename "$0") --update
 EOF
 }
 
@@ -217,6 +287,10 @@ parse_args() {
             --save-config)
                 save_config
                 log "INFO" "Configuration saved to $CONFIG_FILE"
+                exit 0
+                ;;
+            --update)
+                check_self_update
                 exit 0
                 ;;
             *)
