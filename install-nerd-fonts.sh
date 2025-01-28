@@ -4,7 +4,6 @@
 SCRIPT_VERSION="1.0.1"
 SCRIPT_REPO="dahromy/nerd-fonts-manager"
 
-[Rest of the script content...]
 check_self_update() {
     log "INFO" "Checking for script updates..."
     
