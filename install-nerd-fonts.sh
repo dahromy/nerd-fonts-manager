@@ -594,7 +594,7 @@ install_font() {
             # For Windows, extract only .ttf and .otf files
             unzip -j "$zip_file" "*.ttf" "*.otf" -d "$font_dir" > /dev/null
             ;;
-	termux)
+    termux)
             # Termux only supports one active font at a time
             unzip -j "$zip_file" "*.ttf" -d "$font_dir" > /dev/null
 
