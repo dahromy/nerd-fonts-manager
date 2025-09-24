@@ -115,7 +115,7 @@ set_platform_config() {
             REFRESH_COMMAND="fc-cache -fv"
             PREVIEW_COMMAND="convert -size 600x400 -background white -fill black -font"
             ;;
-	termux)
+        termux)
             FONTS_DIR="${HOME}/.termux/fonts"
             BACKUP_DIR="${HOME}/.termux/fonts.backup"
             REFRESH_COMMAND="termux-reload-settings"
