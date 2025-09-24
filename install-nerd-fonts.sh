@@ -84,10 +84,13 @@ declare -A PROFILES=(
 # Detect OS and set platform-specific variables
 detect_os() {
     case "$(uname -s 2>/dev/null || echo 'unknown')" in
-        Linux*)
-            OS="linux"
-            if grep -q Microsoft /proc/version 2>/dev/null; then
-                OS="wsl"
+	Linux*)
+            if [ -n "$TERMUX_VERSION" ] || [ -d "$HOME/.termux" ]; then
+              OS="termux"
+            elif grep -q Microsoft /proc/version 2>/dev/null; then
+              OS="wsl"
+            else
+              OS="linux"
             fi
             ;;
         Darwin*)
@@ -111,6 +114,12 @@ set_platform_config() {
             BACKUP_DIR="${HOME}/.local/share/fonts.backup"
             REFRESH_COMMAND="fc-cache -fv"
             PREVIEW_COMMAND="convert -size 600x400 -background white -fill black -font"
+            ;;
+	termux)
+            FONTS_DIR="${HOME}/.termux/fonts"
+            BACKUP_DIR="${HOME}/.termux/fonts.backup"
+            REFRESH_COMMAND="termux-reload-settings"
+            PREVIEW_COMMAND="echo 'Preview not supported in Termux'"
             ;;
         macos)
             FONTS_DIR="${HOME}/Library/Fonts"
@@ -371,7 +380,7 @@ check_dependencies() {
             macos)
                 log "INFO" "Install using: brew install ${missing[*]}"
                 ;;
-            windows)
+	    windows)
                 log "INFO" "Install Git Bash from https://git-scm.com/download/win"
                 log "INFO" "Then run these commands in Git Bash:"
                 log "INFO" "curl -o wget.exe https://eternallybored.org/misc/wget/releases/wget.exe"
@@ -584,6 +593,20 @@ install_font() {
         windows|wsl)
             # For Windows, extract only .ttf and .otf files
             unzip -j "$zip_file" "*.ttf" "*.otf" -d "$font_dir" > /dev/null
+            ;;
+	termux)
+            # Termux only supports one active font at a time
+            unzip -j "$zip_file" "*.ttf" -d "$font_dir" > /dev/null
+
+            local first_font
+            first_font=$(find "$font_dir" -type f -name "*.ttf" | head -n 1)
+            if [ -n "$first_font" ]; then
+                cp "$first_font" "$HOME/.termux/font.ttf"
+                log "INFO" "Font copied to ~/.termux/font.ttf"
+            else
+                log "ERROR" "No .ttf font file found for $font"
+                return 1
+            fi
             ;;
         *)
             # For Linux and macOS, extract all font files
