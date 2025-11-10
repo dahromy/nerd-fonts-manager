@@ -560,14 +560,10 @@ install_fonts() {
             done
             ;;
         macos)
-            # Use xargs for macOS parallel processing
-            if command -v xargs &>/dev/null; then
-                printf '%s\n' "${fonts[@]}" | xargs -P "$PARALLEL_DOWNLOADS" -I {} bash -c "install_font {} '$version'"
-            else
-                for font in "${fonts[@]}"; do
-                    install_font "$font" "$version"
-                done
-            fi
+            # Sequential installation for macOS (parallel not supported)
+            for font in "${fonts[@]}"; do
+                install_font "$font" "$version"
+            done
             ;;
         *)
             # Use GNU parallel for other platforms if available
