@@ -203,7 +203,7 @@ Commands:
     uninstall          Remove installed fonts
     update             Check for and install font updates
     preview            Preview installed fonts
-    list               List available fonts
+    list               List installed fonts
     profile            List available installation profiles
 
 Options:
@@ -815,27 +815,25 @@ main() {
             ;;
             
         list)
-            if [ -n "$SELECTED_PROFILE" ]; then
-                if [ -n "${PROFILES[$SELECTED_PROFILE]}" ]; then
-                    echo "Fonts in profile '$SELECTED_PROFILE':"
-                    echo "-----------------------------"
-                    for font in ${PROFILES[$SELECTED_PROFILE]}; do
-                        echo "  - $font"
-                    done
-                else
-                    log "ERROR" "Invalid profile: $SELECTED_PROFILE"
-                    exit 1
-                fi
-            else
-                echo "Available installation profiles:"
-                echo "-----------------------------"
-                for profile in "${!PROFILES[@]}"; do
-                    echo "$profile:"
-                    for font in ${PROFILES[$profile]}; do
-                        echo "  - $font"
-                    done
-                    echo
+            echo "Installed fonts:"
+            echo "-----------------------------"
+            if [ -d "$FONTS_DIR" ] && [ -n "$(ls -A "$FONTS_DIR" 2>/dev/null)" ]; then
+                local font_count=0
+                for font_dir in "$FONTS_DIR"/*; do
+                    if [ -d "$font_dir" ]; then
+                        local font_name=$(basename "$font_dir")
+                        echo "  - $font_name"
+                        font_count=$((font_count + 1))
+                    fi
                 done
+                echo
+                echo "Total: $font_count font(s) installed"
+            else
+                echo "  No fonts installed yet"
+                echo
+                echo "To install fonts, run:"
+                echo "  $(basename "$0") install --fonts FontName"
+                echo "  $(basename "$0") install --profile coding"
             fi
             ;;
             
