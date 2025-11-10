@@ -125,7 +125,13 @@ curl -o- https://github.com/dahromy/nerd-fonts-manager/releases/latest/download/
 ./install-nerd-fonts.sh --update
 ```
 
-5. List available profiles:
+5. List installed fonts:
+```bash
+# List all installed fonts
+./install-nerd-fonts.sh list
+```
+
+6. List available profiles:
 ```bash
 ./install-nerd-fonts.sh profile
 ```
