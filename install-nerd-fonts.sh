@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Script metadata
 SCRIPT_VERSION="1.0.1"
