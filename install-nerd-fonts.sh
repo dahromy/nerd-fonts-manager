@@ -106,14 +106,45 @@ detect_os() {
     esac
 }
 
+# Detect ImageMagick version and set appropriate command
+get_imagemagick_command() {
+    # Check if ImageMagick is available
+    if command -v magick &>/dev/null; then
+        # ImageMagick v7+ is installed, use 'magick' command
+        echo "magick"
+    elif command -v convert &>/dev/null; then
+        # Check if this is ImageMagick v7 with convert as alias
+        local version_output
+        version_output=$(convert -version 2>/dev/null | head -n 1)
+        if echo "$version_output" | grep -q "ImageMagick 7"; then
+            # ImageMagick v7 but convert is still available (compatibility mode)
+            echo "magick"
+        else
+            # ImageMagick v6 or earlier, use 'convert' command
+            echo "convert"
+        fi
+    else
+        # ImageMagick not found
+        echo ""
+    fi
+}
+
 # Set platform-specific paths and commands
 set_platform_config() {
+    # Detect ImageMagick command to use
+    local imagemagick_cmd
+    imagemagick_cmd=$(get_imagemagick_command)
+    
     case "$OS" in
         linux|wsl)
             FONTS_DIR="${HOME}/.local/share/fonts"
             BACKUP_DIR="${HOME}/.local/share/fonts.backup"
             REFRESH_COMMAND="fc-cache -fv"
-            PREVIEW_COMMAND="convert -size 600x400 -background white -fill black -font"
+            if [ -n "$imagemagick_cmd" ]; then
+                PREVIEW_COMMAND="$imagemagick_cmd -size 600x400 -background white -fill black -font"
+            else
+                PREVIEW_COMMAND="echo 'ImageMagick not found. Preview not available.'"
+            fi
             ;;
         termux)
             FONTS_DIR="${HOME}/.termux/fonts"
@@ -125,7 +156,11 @@ set_platform_config() {
             FONTS_DIR="${HOME}/Library/Fonts"
             BACKUP_DIR="${HOME}/Library/Fonts.backup"
             REFRESH_COMMAND="sudo atsutil databases -remove"
-            PREVIEW_COMMAND="convert -size 600x400 -background white -fill black -font"
+            if [ -n "$imagemagick_cmd" ]; then
+                PREVIEW_COMMAND="$imagemagick_cmd -size 600x400 -background white -fill black -font"
+            else
+                PREVIEW_COMMAND="echo 'ImageMagick not found. Preview not available.'"
+            fi
             ;;
         windows)
             if [ "$OS" = "windows" ]; then
@@ -137,7 +172,11 @@ set_platform_config() {
                 BACKUP_DIR="/mnt/c/Windows/Fonts.backup"
             fi
             REFRESH_COMMAND="echo 'Please restart Windows to refresh font cache'"
-            PREVIEW_COMMAND="convert -size 600x400 -background white -fill black -font"
+            if [ -n "$imagemagick_cmd" ]; then
+                PREVIEW_COMMAND="$imagemagick_cmd -size 600x400 -background white -fill black -font"
+            else
+                PREVIEW_COMMAND="echo 'ImageMagick not found. Preview not available.'"
+            fi
             ;;
     esac
 }
@@ -345,20 +384,12 @@ check_dependencies() {
             if command -v parallel &>/dev/null; then
                 deps+=("parallel")
             fi
-            if command -v convert &>/dev/null; then
-                deps+=("convert")
-            fi
             if command -v fc-list &>/dev/null; then
                 deps+=("fc-list")
             fi
             ;;
-        macos)
-            if command -v convert &>/dev/null; then
-                deps+=("convert")
-            fi
-            ;;
-        windows)
-            # Windows only requires basic dependencies
+        macos|windows)
+            # ImageMagick is optional for preview functionality
             ;;
     esac
     
@@ -432,7 +463,8 @@ generate_preview() {
     font_file=$(find "$FONTS_DIR/$font" -type f \( -name "*.ttf" -o -name "*.otf" \) -print -quit)
     
     if [ -n "$font_file" ]; then
-        if command -v convert &>/dev/null; then
+        # Check if ImageMagick is available (either magick or convert command)
+        if command -v magick &>/dev/null || command -v convert &>/dev/null; then
             $PREVIEW_COMMAND "$font_file" -pointsize 24 -gravity center -annotate +0+0 "$PREVIEW_TEXT" "$preview_file"
             
             case "$OS" in

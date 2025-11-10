@@ -35,6 +35,20 @@ A cross-platform shell script for installing, managing, and previewing [Nerd Fon
 
 ## Prerequisites
 
+### Required Dependencies
+- `curl` - For downloading files and API requests
+- `jq` - For parsing JSON responses
+- `wget` - For resumable downloads
+- `unzip` - For extracting font archives
+
+### Optional Dependencies
+- `parallel` (Linux) - For faster parallel font installation
+- `imagemagick` - For font preview generation (supports both v6 and v7)
+  - ImageMagick v6: Uses `convert` command
+  - ImageMagick v7: Uses `magick` command (recommended)
+  - The script automatically detects and uses the appropriate command
+- `fontconfig` (Linux) - For font validation and cache management
+
 ### Linux/WSL
 ```bash
 # Debian/Ubuntu
